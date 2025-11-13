@@ -6,7 +6,7 @@ interface ChatMessageProps {
 }
 
 export const ChatMessage = ({ message }: ChatMessageProps) => {
-  const isBot = message.type === 'bot';
+  
 
   if (message.type === 'user') {
     return (
