@@ -1,149 +1,328 @@
-import { useState, useRef, useEffect } from 'react';
-import { Header } from './components/Header';
-import { ChatMessage } from './components/ChatMessage';
-import { LoadingMessage } from './components/LoadingMessage';
-import { ImageUpload } from './components/ImageUpload';
-import { EmptyState } from './components/EmptyState';
-import { analyzePlantImage } from './services/api.service';
-import { Message } from './types';
-import { AlertCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Upload, Camera, X, Leaf, Info, Droplets, Sprout, UtensilsCrossed, AlertTriangle } from 'lucide-react';
 
-function App() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+type Taxonomy = {
+  kingdom?: string;
+  phylum?: string;
+  class?: string;
+  order?: string;
+  family?: string;
+  genus?: string;
+};
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+type CareInstructions = {
+  watering?: string;
+  propagation?: string;
+  edibleParts?: string;
+};
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading]);
+type Disease = {
+  name: string;
+  probability: string;
+  description: string;
+  treatment?: string;
+  prevention?: string;
+};
 
-  const handleImageSelect = (file: File, preview: string) => {
-    setSelectedFile(file);
-    setPreviewUrl(preview);
-    setError(null);
-  };
+type Result = {
+  confidence: string;
+  plantType: string;
+  commonNames: string;
+  scientificName: string;
+  taxonomy: Taxonomy;
+  description: string;
+  careInstructions: CareInstructions;
+  diseases: Disease[];
+};
 
-  const handleAnalyze = async () => {
-    if (!selectedFile || !previewUrl) return;
+const App: React.FC = () => {
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<Result | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    setError(null);
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: 'Analyzing this plant image...',
-      timestamp: new Date(),
-      imageUrl: previewUrl,
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
-
-    try {
-      const response = await analyzePlantImage(selectedFile);
-
-      if (response.success && response.data) {
-        const botMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          type: 'bot',
-          content: response.data,
-          timestamp: new Date(),
-        };
-
-        setMessages((prev) => [...prev, botMessage]);
-      } else {
-        throw new Error(response.error || 'Analysis failed');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to analyze image';
-      setError(errorMessage);
-
-      const errorBotMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'bot',
-        content: {
-          plantType: 'Error',
-          scientificName: 'N/A',
-          disease: errorMessage,
-          healthStatus: 'Unknown',
-          confidence: 0,
-          recommendations: [
-            'Please try again with a clearer image',
-            'Ensure your backend server is running',
-            'Check that API credentials are configured correctly',
-          ],
-        },
-        timestamp: new Date(),
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+        setResult(null);
       };
+      reader.readAsDataURL(file);
+    }
+  };
 
-      setMessages((prev) => [...prev, errorBotMessage]);
-    } finally {
-      setIsLoading(false);
-      setSelectedFile(null);
-      setPreviewUrl(null);
+  const handleIdentify = () => {
+    if (!selectedImage) return;
+
+    setLoading(true);
+    
+    // Mock response for now — replace with real API call if desired
+    setTimeout(() => {
+      setResult({
+        confidence: '95.50%',
+        plantType: 'Monstera deliciosa',
+        commonNames: 'Swiss cheese plant, Split-leaf philodendron, Mexican breadfruit',
+        scientificName: 'Monstera deliciosa',
+        taxonomy: {
+          kingdom: 'Plantae',
+          phylum: 'Tracheophyta',
+          class: 'Liliopsida',
+          order: 'Alismatales',
+          family: 'Araceae',
+          genus: 'Monstera',
+        },
+        description:
+          'Monstera deliciosa is a species of flowering plant native to tropical forests of southern Mexico, south to Panama. It has been introduced to many tropical areas and has become a mildly invasive species in Hawaii, Seychelles, Ascension Island and the Society Islands. It is a popular houseplant known for its large, naturally holey leaves.',
+        careInstructions: {
+          watering:
+            'Water when the top 2-3 inches of soil are dry. Typically once a week in growing season, less in winter. Prefers consistently moist but not waterlogged soil.',
+          propagation: 'Stem cuttings, air layering, division. Best done in spring or early summer.',
+          edibleParts: 'Ripe fruit (when fully mature). Unripe fruit contains calcium oxalate crystals and should not be consumed.',
+        },
+        diseases: [
+          {
+            name: 'Root Rot',
+            probability: '15.20%',
+            description:
+              'Fungal infection caused by overwatering and poor drainage, leading to decay of root system.',
+            treatment:
+              'Remove affected roots, repot in fresh well-draining soil, reduce watering frequency. Apply fungicide if severe.',
+            prevention:
+              'Ensure proper drainage, avoid overwatering, use well-draining potting mix, provide adequate air circulation.',
+          },
+        ],
+      });
+      setLoading(false);
+    }, 2000);
+  };
+
+  const handleReset = () => {
+    setSelectedImage(null);
+    setResult(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-emerald-50 flex flex-col">
-      <Header />
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background Image */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage:
+            "url(https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=1920&q=80)",
+        }}
+      >
+        <div className="absolute inset-0 bg-black/35"></div>
+      </div>
 
-      <main className="flex-1 overflow-hidden flex flex-col max-w-4xl w-full mx-auto">
-        <div className="flex-1 overflow-y-auto px-4 py-6">
-          {messages.length === 0 && !isLoading ? (
-            <EmptyState />
-          ) : (
-            <>
-              {messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
-              ))}
-              {isLoading && <LoadingMessage />}
-            </>
+      {/* Main Content */}
+      <div className="relative z-10 py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-5xl font-bold text-white drop-shadow-2xl mb-3">🌿 Plant Identifier</h1>
+            <p className="text-white text-lg font-medium drop-shadow-lg">From Farm to Garden - Identify Any Plant</p>
+            <p className="text-green-100 text-sm mt-2 drop-shadow-md">Perfect for farmers, gardeners, and plant enthusiasts</p>
+          </div>
+
+          {/* Upload Section */}
+          {!selectedImage && (
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-8 mb-6 border-2 border-green-300">
+              <div className="border-2 border-dashed border-green-400 rounded-xl p-12 text-center hover:border-green-500 hover:bg-green-50/50 transition-all">
+                <div className="flex justify-center mb-4">
+                  <Camera className="w-16 h-16 text-green-600" />
+                </div>
+                <h3 className="text-2xl font-semibold text-gray-800 mb-2">Upload Plant Image</h3>
+                <p className="text-gray-600 mb-6">📸 Capture crops, flowers, trees, or any vegetation</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl cursor-pointer hover:from-green-700 hover:to-emerald-700 transition-all font-semibold text-lg shadow-lg transform hover:scale-105"
+                >
+                  <Upload className="w-6 h-6 mr-3" />
+                  Choose Plant Photo
+                </label>
+              </div>
+            </div>
           )}
-          <div ref={messagesEndRef} />
-        </div>
 
-        <div className="border-t border-gray-200 bg-white/80 backdrop-blur-sm">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            {error && (
-              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-red-800">Error</p>
-                  <p className="text-xs text-red-600">{error}</p>
+          {/* Image Preview */}
+          {selectedImage && (
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 mb-6 border-2 border-green-300">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold text-gray-800 flex items-center">
+                  <Leaf className="w-6 h-6 text-green-600 mr-2" />
+                  Your Plant Sample
+                </h3>
+                <button
+                  onClick={handleReset}
+                  className="flex items-center px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
+                >
+                  <X className="w-5 h-5 mr-2" />
+                  Clear
+                </button>
+              </div>
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 mb-4 border-2 border-gray-200">
+                <img src={selectedImage} alt="Selected plant" className="w-full max-h-96 object-contain rounded-lg" />
+              </div>
+              <button
+                onClick={handleIdentify}
+                disabled={loading}
+                className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-bold hover:from-green-700 hover:to-emerald-700 transition-all disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed flex items-center justify-center text-lg shadow-lg"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
+                    Analyzing Plant...
+                  </>
+                ) : (
+                  <>
+                    <Leaf className="w-6 h-6 mr-3" />
+                    Identify This Plant
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Results */}
+          {result && (
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 space-y-6 border-2 border-green-300">
+              {/* Basic Info */}
+              <div>
+                <h2 className="text-3xl font-bold text-green-800 mb-4 flex items-center">
+                  <Info className="w-8 h-8 mr-3 text-green-600" />
+                  Plant Analysis Results
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gradient-to-br from-green-100 to-green-200 p-5 rounded-xl border-2 border-green-300 shadow-md">
+                    <p className="text-sm text-gray-700 mb-1 font-medium">Confidence Level</p>
+                    <p className="text-3xl font-bold text-green-800">{result.confidence}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-emerald-100 to-emerald-200 p-5 rounded-xl border-2 border-emerald-300 shadow-md">
+                    <p className="text-sm text-gray-700 mb-1 font-medium">Plant Species</p>
+                    <p className="text-3xl font-bold text-emerald-800">{result.plantType}</p>
+                  </div>
                 </div>
               </div>
-            )}
 
-            <div className="space-y-3">
-              <ImageUpload onImageSelect={handleImageSelect} disabled={isLoading} />
+              {/* Common Names */}
+              <div className="bg-gradient-to-br from-lime-50 to-lime-100 p-5 rounded-xl border-2 border-lime-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Common Names</h3>
+                <p className="text-gray-700 font-medium">{result.commonNames}</p>
+              </div>
 
-              {previewUrl && (
-                <button
-                  onClick={handleAnalyze}
-                  disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-2xl px-6 py-4 shadow-lg transition-all duration-200 hover:shadow-xl font-semibold"
-                >
-                  {isLoading ? 'Analyzing...' : 'Analyze Plant Health'}
-                </button>
+              {/* Scientific Name */}
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border-2 border-blue-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Scientific Classification</h3>
+                <p className="text-gray-700 italic text-xl font-semibold">{result.scientificName}</p>
+              </div>
+
+              {/* Description */}
+              <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-5 rounded-xl border-2 border-amber-200">
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">About This Plant</h3>
+                <p className="text-gray-700 leading-relaxed">{result.description}</p>
+              </div>
+
+              {/* Care Instructions */}
+              <div>
+                <h3 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                  <Sprout className="w-6 h-6 mr-2 text-green-600" />
+                  Farming & Care Guide
+                </h3>
+                <div className="space-y-3">
+                  <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-5 rounded-xl border-l-4 border-blue-600 shadow-md">
+                    <div className="flex items-center mb-2">
+                      <Droplets className="w-6 h-6 text-blue-700 mr-2" />
+                      <p className="font-bold text-blue-900 text-lg">Watering Schedule</p>
+                    </div>
+                    <p className="text-gray-800">{result.careInstructions.watering}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-100 to-purple-200 p-5 rounded-xl border-l-4 border-purple-600 shadow-md">
+                    <div className="flex items-center mb-2">
+                      <Sprout className="w-6 h-6 text-purple-700 mr-2" />
+                      <p className="font-bold text-purple-900 text-lg">Propagation Methods</p>
+                    </div>
+                    <p className="text-gray-800">{result.careInstructions.propagation}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-orange-100 to-orange-200 p-5 rounded-xl border-l-4 border-orange-600 shadow-md">
+                    <div className="flex items-center mb-2">
+                      <UtensilsCrossed className="w-6 h-6 text-orange-700 mr-2" />
+                      <p className="font-bold text-orange-900 text-lg">Edible Information</p>
+                    </div>
+                    <p className="text-gray-800">{result.careInstructions.edibleParts}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Taxonomy */}
+              <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-5 rounded-xl border-2 border-teal-200">
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">Complete Taxonomy</h3>
+                <div className="bg-white/70 p-4 rounded-lg space-y-2">
+                  {Object.entries(result.taxonomy).map(([key, value]) => (
+                    <div key={key} className="flex justify-between py-2 border-b border-teal-200 last:border-0">
+                      <span className="text-gray-700 capitalize font-semibold">{key}:</span>
+                      <span className="text-gray-900 font-bold">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Diseases */}
+              {result.diseases.length > 0 && (
+                <div>
+                  <h3 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <AlertTriangle className="w-7 h-7 text-red-600 mr-2" />
+                    Plant Health Assessment
+                  </h3>
+                  <div className="space-y-4">
+                    {result.diseases.map((disease, index) => (
+                      <div key={index} className="border-2 border-red-300 bg-gradient-to-br from-red-50 to-red-100 p-6 rounded-xl shadow-lg">
+                        <div className="flex justify-between items-start mb-3">
+                          <h4 className="font-bold text-red-900 text-xl">{disease.name}</h4>
+                          <span className="text-sm bg-red-300 text-red-900 px-4 py-2 rounded-full font-bold">{disease.probability}</span>
+                        </div>
+                        <p className="text-gray-800 mb-4 font-medium">{disease.description}</p>
+                        <div className="bg-white/80 p-4 rounded-lg mb-3 border border-red-200">
+                          <p className="font-bold text-red-900 mb-2">💊 Treatment Plan:</p>
+                          <p className="text-gray-800">{disease.treatment}</p>
+                        </div>
+                        <div className="bg-white/80 p-4 rounded-lg border border-red-200">
+                          <p className="font-bold text-red-900 mb-2">🛡️ Prevention Tips:</p>
+                          <p className="text-gray-800">{disease.prevention}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
+          )}
 
-            <p className="text-xs text-center text-gray-500 mt-3">
-              Powered by AI • Instant plant health analysis
-            </p>
-          </div>
+          {/* Info Footer */}
+          {!selectedImage && !result && (
+            <div className="text-center bg-white/90 backdrop-blur-md rounded-xl p-6 shadow-lg border-2 border-green-300">
+              <p className="text-gray-700 font-semibold mb-2">🌱 Pro Tips for Best Results</p>
+              <p className="text-gray-600 text-sm">✓ Use clear, well-lit photos</p>
+              <p className="text-gray-600 text-sm">✓ Capture leaves, flowers, or distinct features</p>
+              <p className="text-gray-600 text-sm">✓ Supported: JPEG, PNG, WEBP</p>
+            </div>
+          )}
         </div>
-      </main>
+      </div>
     </div>
   );
-}
+};
 
 export default App;
